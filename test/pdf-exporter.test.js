@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
-import { createPdfFromPng } from '../src/capture/pdf-exporter.js';
+import { createPdfFromPng, getPageImageY } from '../src/capture/pdf-exporter.js';
 
 function createPngBlob(width, height) {
 	 const png = new PNG({ width, height });
@@ -23,5 +23,17 @@ describe('PDF export', () => {
 		 const document = await PDFDocument.load(await output.arrayBuffer());
 
 		 expect(document.getPageCount()).toBeGreaterThan(1);
+	 });
+
+	 it('places page slices from the top of the image downward', () => {
+		 const pageHeight = 841.89;
+		 const margin = 36;
+		 const imageHeight = 1600;
+		 const contentHeight = pageHeight - margin * 2;
+
+		 expect(getPageImageY({ pageHeight, margin, imageHeight, contentHeight, pageIndex: 0 }))
+			 .toBeCloseTo(pageHeight - margin - imageHeight);
+		 expect(getPageImageY({ pageHeight, margin, imageHeight, contentHeight, pageIndex: 1 }))
+			 .toBeCloseTo(pageHeight - margin - imageHeight + contentHeight);
 	 });
 });

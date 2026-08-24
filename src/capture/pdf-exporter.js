@@ -41,6 +41,10 @@ function getPageOptions(options = {}) {
 	 };
 }
 
+export function getPageImageY({ pageHeight, margin, imageHeight, contentHeight, pageIndex }) {
+	 return pageHeight - margin - imageHeight + pageIndex * contentHeight;
+}
+
 export async function createPdfFromPng(pngBlob, options) {
 	 const page = getPageOptions(options);
 	 const pdfDocument = await PDFDocument.create();
@@ -52,7 +56,13 @@ export async function createPdfFromPng(pngBlob, options) {
 		 const pdfPage = pdfDocument.addPage([page.pageWidth, page.pageHeight]);
 		 pdfPage.drawImage(image, {
 			 x: page.margin,
-			 y: page.pageHeight - page.margin - (pageIndex + 1) * page.contentHeight,
+			 y: getPageImageY({
+				 pageHeight: page.pageHeight,
+				 margin: page.margin,
+				 imageHeight,
+				 contentHeight: page.contentHeight,
+				 pageIndex
+			 }),
 			 width: page.contentWidth,
 			 height: imageHeight
 		 });
