@@ -7,12 +7,14 @@ await cp('src/manifest.json', 'dist/manifest.json');
 await cp('src/popup.html', 'dist/popup.html');
 await cp('src/popup.css', 'dist/popup.css');
 
+const entryPoints = {
+	'popup': 'src/popup.js',
+	'service-worker': 'src/service-worker.js',
+	'content-script': 'src/content-script.js'
+};
+
 await build({
-	entryPoints: {
-		'popup': 'src/popup.js',
-		'service-worker': 'src/service-worker.js',
-		'content-script': 'src/content-script.js'
-	},
+	entryPoints,
 	bundle: true,
 	format: 'iife',
 	outdir: 'dist',
