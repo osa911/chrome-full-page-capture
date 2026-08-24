@@ -13,6 +13,7 @@
     .scroll-readout { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
     main { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 98px 0 72px; }
     .intro, section { margin-bottom: 28px; padding: clamp(24px, 5vw, 48px); background: #fff; border: 1px solid #dfe5f1; border-radius: 18px; box-shadow: 0 14px 36px rgb(23 32 51 / 7%); }
+    .sticky-note { position: sticky; z-index: 1; top: 78px; margin: 0 0 28px; padding: 14px 18px; color: #713f12; font-weight: 700; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 12px; box-shadow: 0 8px 20px rgb(113 63 18 / 12%); }
     h1, h2 { line-height: 1.15; }
     h1 { margin-top: 0; font-size: clamp(2rem, 6vw, 4rem); }
     h2 { margin-top: 0; color: #1d4ed8; }
@@ -36,6 +37,8 @@
       <h1>A deliberately long local page</h1>
       <p>This self-contained page gives the extension long text, embedded images, a canvas, fixed controls, and an independently scrollable region. Scroll partway down before capture to check that the page returns to the same position.</p>
     </article>
+
+    <aside class="sticky-note">Sticky fixture note: this element stays below the fixed header while you scroll.</aside>
 
     <section>
       <h2>Opening notes</h2>
