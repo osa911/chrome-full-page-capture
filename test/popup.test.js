@@ -53,6 +53,8 @@ it('starts the selected format and renders capture lifecycle messages', async ()
 
 	listener.mock.calls[0][0]({ type: 'CAPTURE_PROGRESS', completed: 2, total: 4 });
 	expect(popupDocument.elements['#status'].textContent).toBe('Captured 2 of 4 viewports');
+	listener.mock.calls[0][0]({ type: 'CAPTURE_PROGRESS', completed: 4, total: 4 });
+	expect(popupDocument.elements['#status'].textContent).toBe('Captured 4 of 4 viewports');
 	listener.mock.calls[0][0]({ type: 'CAPTURE_PROGRESS', completed: 4, total: 4, exporting: true });
 	expect(popupDocument.elements['#status'].textContent).toBe('Creating PDF…');
 	listener.mock.calls[0][0]({ type: 'CAPTURE_COMPLETE' });

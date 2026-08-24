@@ -166,7 +166,16 @@ export async function captureTab(tabId, format) {
 		viewportHeight: metrics.viewportHeight,
 		pixelRatio: metrics.pixelRatio
 	});
-	const output = format === 'pdf' ? await createPdfFromPng(png) : png;
+	let output = png;
+	if (format === 'pdf') {
+		await chrome.runtime.sendMessage({
+			type: MESSAGE_TYPES.CAPTURE_PROGRESS,
+			completed: frames.length,
+			total: positions.length,
+			exporting: true
+		});
+		output = await createPdfFromPng(png);
+	}
 	return downloadBlob(output, format);
 }
 

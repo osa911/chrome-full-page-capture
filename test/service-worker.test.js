@@ -119,6 +119,12 @@ it('exports a PDF only after every frame succeeds', async () => {
 
 	expect(await capture).toEqual({ downloadId: 42, filename: 'full-page-capture.pdf' });
 	expect(createPdfFromPng).toHaveBeenCalledWith(png);
+	expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
+		type: 'CAPTURE_PROGRESS',
+		completed: 3,
+		total: 3,
+		exporting: true
+	});
 	expect(chrome.downloads.download).toHaveBeenCalledWith({
 		url: 'data:application/pdf;base64,cGRm',
 		filename: 'full-page-capture.pdf',

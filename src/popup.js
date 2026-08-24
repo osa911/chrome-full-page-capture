@@ -54,8 +54,7 @@ export function initializePopup(document, runtime) {
 
 		switch (message.type) {
 			case MESSAGE_TYPES.CAPTURE_PROGRESS:
-				if (selectedFormat === 'pdf' && (message.exporting
-					|| message.completed === message.total)) {
+				if (message.exporting === true) {
 					setStatus('Creating PDF…');
 				} else {
 					setStatus(`Captured ${message.completed} of ${message.total} viewports`);

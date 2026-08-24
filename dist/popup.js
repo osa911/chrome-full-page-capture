@@ -55,7 +55,7 @@
       }
       switch (message.type) {
         case MESSAGE_TYPES.CAPTURE_PROGRESS:
-          if (selectedFormat === "pdf" && (message.exporting || message.completed === message.total)) {
+          if (message.exporting === true) {
             setStatus("Creating PDF\u2026");
           } else {
             setStatus(`Captured ${message.completed} of ${message.total} viewports`);
