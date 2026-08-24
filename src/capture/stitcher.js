@@ -44,6 +44,20 @@ function requireFrames(value) {
 	 return value;
 }
 
+function getRasterPlacement(placement, sourceScale, destinationScale) {
+	const sourceStart = Math.round(placement.sourceY * sourceScale);
+	const sourceEnd = Math.round((placement.sourceY + placement.height) * sourceScale);
+	const destinationStart = Math.round(placement.destinationY * destinationScale);
+	const destinationEnd = Math.round((placement.destinationY + placement.height) * destinationScale);
+
+	return {
+		sourceY: sourceStart,
+		sourceHeight: sourceEnd - sourceStart,
+		destinationY: destinationStart,
+		destinationHeight: destinationEnd - destinationStart
+	};
+}
+
 export async function stitchFrames({
 	 frames,
 	 documentWidth,
@@ -84,19 +98,23 @@ export async function stitchFrames({
 					 documentHeight: height
 				 });
 
-			 if (placement.height > 0) {
-				 const sourceY = Math.floor(placement.sourceY * ratio);
-				 const sourceHeight = Math.ceil(placement.height * ratio);
+			 const rasterPlacement = getRasterPlacement(
+				 placement,
+				 bitmap.height / viewport,
+				 ratio
+			 );
+
+			 if (rasterPlacement.sourceHeight > 0 && rasterPlacement.destinationHeight > 0) {
 				 context.drawImage(
 					 bitmap,
 					 0,
-					 sourceY,
+					 rasterPlacement.sourceY,
 					 bitmap.width,
-					 sourceHeight,
+					 rasterPlacement.sourceHeight,
 					 0,
-					 Math.floor(placement.destinationY * ratio),
+					 rasterPlacement.destinationY,
 					 physicalWidth,
-					 sourceHeight
+					 rasterPlacement.destinationHeight
 				 );
 			 }
 		 } finally {

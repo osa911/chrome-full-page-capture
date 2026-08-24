@@ -15,6 +15,8 @@ Save the active webpage as a long PNG or an image-based PDF. The extension proce
 
 Chrome blocks extension access to restricted pages, including `chrome://` URLs. Capture a normal webpage instead.
 
+This version captures only pages that are no wider than the visible viewport. It reports an error instead of attempting horizontally overflowing pages.
+
 The capture preserves Chrome's rendered pixels. Fixed headers, floating buttons, and other fixed elements can repeat in a long capture by design.
 
 ## Run automated checks

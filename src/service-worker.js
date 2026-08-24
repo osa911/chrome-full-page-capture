@@ -5,12 +5,22 @@ import { isCaptureRequest, MESSAGE_TYPES } from './shared/messages.js';
 
 const CAPTURE_INTERVAL_MS = 500;
 
+let captureInFlight = false;
+
 function getErrorMessage(error) {
 	return error instanceof Error ? error.message : String(error);
 }
 
 function wait(milliseconds) {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function notifyPopup(message) {
+	try {
+		await chrome.runtime.sendMessage(message);
+	} catch {
+		// The popup can close before a progress or terminal notification arrives.
+	}
 }
 
 function getContentScriptResponse(response) {
@@ -105,7 +115,7 @@ async function downloadBlob(blob, format) {
 	return { downloadId, filename };
 }
 
-export async function captureTab(tabId, format) {
+async function captureTabOnce(tabId, format) {
 	if (format !== 'png' && format !== 'pdf') {
 		throw new Error('Capture format must be png or pdf.');
 	}
@@ -120,6 +130,9 @@ export async function captureTab(tabId, format) {
 		files: ['content-script.js']
 	});
 	const metrics = getMetrics(await sendContentScriptMessage(tabId, { type: MESSAGE_TYPES.GET_METRICS }));
+	if (metrics.documentWidth > metrics.viewportWidth) {
+		throw new Error('Full-page capture does not support pages wider than the viewport.');
+	}
 	const initialScroll = { scrollX: metrics.scrollX, scrollY: metrics.scrollY };
 	const positions = createCapturePositions({
 		documentHeight: metrics.documentHeight,
@@ -146,7 +159,7 @@ export async function captureTab(tabId, format) {
 				throw new Error('Chrome did not return an image for this capture.');
 			}
 			frames.push({ dataUrl, scrollY: actualPosition.scrollY });
-			await chrome.runtime.sendMessage({
+			void notifyPopup({
 				type: MESSAGE_TYPES.CAPTURE_PROGRESS,
 				completed: frames.length,
 				total: positions.length
@@ -168,7 +181,7 @@ export async function captureTab(tabId, format) {
 	});
 	let output = png;
 	if (format === 'pdf') {
-		await chrome.runtime.sendMessage({
+		void notifyPopup({
 			type: MESSAGE_TYPES.CAPTURE_PROGRESS,
 			completed: frames.length,
 			total: positions.length,
@@ -177,6 +190,19 @@ export async function captureTab(tabId, format) {
 		output = await createPdfFromPng(png);
 	}
 	return downloadBlob(output, format);
+}
+
+export async function captureTab(tabId, format) {
+	if (captureInFlight) {
+		throw new Error('Capture already running.');
+	}
+
+	captureInFlight = true;
+	try {
+		return await captureTabOnce(tabId, format);
+	} finally {
+		captureInFlight = false;
+	}
 }
 
 async function startCapture(format) {
@@ -194,13 +220,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	}
 
 	void startCapture(message.format).then(
-		async (result) => {
-			await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.CAPTURE_COMPLETE, ...result });
+		(result) => {
+			void notifyPopup({ type: MESSAGE_TYPES.CAPTURE_COMPLETE, ...result });
 			sendResponse(result);
 		},
-		async (error) => {
+		(error) => {
 			const message = getErrorMessage(error);
-			await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.CAPTURE_ERROR, error: message });
+			void notifyPopup({ type: MESSAGE_TYPES.CAPTURE_ERROR, error: message });
 			sendResponse({ error: message });
 		}
 	);

@@ -192,6 +192,79 @@ it('does not capture or download when metrics are malformed', async () => {
 	expect(chrome.downloads.download).not.toHaveBeenCalled();
 });
 
+it('rejects pages wider than the viewport before capture', async () => {
+	vi.useFakeTimers();
+	const { chrome } = installChrome({
+		responseForMessage(message) {
+			return message.type === 'GET_METRICS'
+				? { ...metrics, documentWidth: 801 }
+				: undefined;
+		}
+	});
+	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+	const { captureTab } = await import('../src/service-worker.js');
+	const capture = captureTab(7, 'png');
+	void capture.catch(() => {});
+	await vi.advanceTimersByTimeAsync(1500);
+
+	await expect(capture).rejects.toThrow('Full-page capture does not support pages wider than the viewport.');
+	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
+	expect(stitchFrames).not.toHaveBeenCalled();
+	expect(chrome.downloads.download).not.toHaveBeenCalled();
+});
+
+it('downloads and responds when runtime notifications cannot be delivered', async () => {
+	vi.useFakeTimers();
+	const { chrome, getListener } = installChrome();
+	chrome.runtime.sendMessage.mockRejectedValue(new Error('Could not establish connection. Receiving end does not exist.'));
+	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+	await import('../src/service-worker.js');
+	const response = new Promise((resolve) => {
+		expect(getListener()({ type: 'START_CAPTURE', format: 'png' }, {}, resolve)).toBe(true);
+	});
+	const terminalResult = Promise.race([
+		response,
+		new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), 1600))
+	]);
+	await vi.advanceTimersByTimeAsync(1600);
+
+	expect(await terminalResult).toEqual({ downloadId: 42, filename: 'full-page-capture.png' });
+	expect(chrome.downloads.download).toHaveBeenCalledTimes(1);
+});
+
+it('rejects a concurrent capture request while the first capture is running', async () => {
+	vi.useFakeTimers();
+	const { chrome, getListener } = installChrome({
+		responseForMessage(message) {
+			return message.type === 'GET_METRICS'
+				? { ...metrics, documentHeight: 600 }
+				: undefined;
+		}
+	});
+	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+	await import('../src/service-worker.js');
+	const firstResponse = new Promise((resolve) => {
+		expect(getListener()({ type: 'START_CAPTURE', format: 'png' }, {}, resolve)).toBe(true);
+	});
+	const secondResponse = new Promise((resolve) => {
+		expect(getListener()({ type: 'START_CAPTURE', format: 'png' }, {}, resolve)).toBe(true);
+	});
+	const secondResult = Promise.race([
+		secondResponse,
+		new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), 1))
+	]);
+	await vi.advanceTimersByTimeAsync(1);
+
+	expect(await secondResult).toEqual({ error: 'Capture already running.' });
+	await vi.advanceTimersByTimeAsync(499);
+	expect(await firstResponse).toEqual({ downloadId: 42, filename: 'full-page-capture.png' });
+	expect(chrome.tabs.captureVisibleTab).toHaveBeenCalledTimes(1);
+	expect(chrome.downloads.download).toHaveBeenCalledTimes(1);
+});
+
 it('does not capture or download when the content script returns invalid scroll coordinates', async () => {
 	vi.useFakeTimers();
 	const { chrome } = installChrome({
