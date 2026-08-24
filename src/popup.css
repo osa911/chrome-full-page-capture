@@ -1,0 +1,9 @@
+body {
+  min-width: 240px;
+  margin: 16px;
+}
+
+main {
+  display: grid;
+  gap: 8px;
+}

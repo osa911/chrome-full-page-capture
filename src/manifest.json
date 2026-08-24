@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Personal full-page capture",
+  "version": "0.1.0",
+  "description": "Save the active webpage as a long PNG or PDF.",
+  "permissions": ["activeTab", "scripting", "downloads"],
+  "background": { "service_worker": "service-worker.js" },
+  "action": {
+    "default_title": "Capture full page",
+    "default_popup": "popup.html"
+  }
+}
