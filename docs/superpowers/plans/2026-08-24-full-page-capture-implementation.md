@@ -216,7 +216,7 @@ it('crops the overlap from the final frame', () => {
 		 scrollY: 1200,
 		 viewportHeight: 900,
 		 documentHeight: 2100
-	 })).toEqual({ sourceY: 300, destinationY: 1800, height: 300 });
+	 })).toEqual({ sourceY: 600, destinationY: 1800, height: 300 });
 });
 ```
 
