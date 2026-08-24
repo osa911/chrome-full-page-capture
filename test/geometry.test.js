@@ -20,6 +20,20 @@ describe('capture geometry', () => {
 			 scrollY: 1200,
 			 viewportHeight: 900,
 			 documentHeight: 2100
-		 })).toEqual({ sourceY: 300, destinationY: 1800, height: 300 });
+		 })).toEqual({ sourceY: 600, destinationY: 1800, height: 300 });
+	 });
+
+	 it('rejects non-finite document heights', () => {
+		 expect(() => createCapturePositions({ documentHeight: Number.NaN, viewportHeight: 900 })).toThrow('documentHeight');
+		 expect(() => createCapturePositions({ documentHeight: Number.POSITIVE_INFINITY, viewportHeight: 900 })).toThrow('documentHeight');
+	 });
+
+	 it('rejects a non-finite document height when placing a frame', () => {
+		 expect(() => computeFramePlacement({
+			 previousScrollY: 0,
+			 scrollY: 900,
+			 viewportHeight: 900,
+			 documentHeight: Number.NaN
+		 })).toThrow('documentHeight');
 	 });
 });

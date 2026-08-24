@@ -6,8 +6,17 @@ function requirePositiveNumber(value, name) {
 	 return value;
 }
 
+function clampDocumentHeight(value) {
+	 const height = Number(value);
+	 if (!Number.isFinite(height)) {
+		 throw new RangeError('documentHeight must be finite');
+	 }
+
+	 return Math.max(0, height);
+}
+
 export function createCapturePositions({ documentHeight, viewportHeight }) {
-	 const height = Math.max(0, Number(documentHeight));
+	 const height = clampDocumentHeight(documentHeight);
 	 const viewport = requirePositiveNumber(Number(viewportHeight), 'viewportHeight');
 
 	 if (height <= viewport) {
@@ -29,14 +38,14 @@ export function createCapturePositions({ documentHeight, viewportHeight }) {
 
 export function computeFramePlacement({ previousScrollY, scrollY, viewportHeight, documentHeight }) {
 	 const viewport = requirePositiveNumber(Number(viewportHeight), 'viewportHeight');
-	 const height = Math.max(0, Number(documentHeight));
+	 const height = clampDocumentHeight(documentHeight);
 	 const previous = Math.max(0, Number(previousScrollY));
 	 const current = Math.max(0, Number(scrollY));
 	 const frameOffset = Math.max(0, current - previous);
 	 const destinationY = previous + viewport;
 
 	 return {
-		 sourceY: frameOffset,
+		 sourceY: Math.max(0, viewport - frameOffset),
 		 destinationY,
 		 height: Math.max(0, Math.min(frameOffset, height - destinationY))
 	 };
