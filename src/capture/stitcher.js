@@ -1,11 +1,39 @@
 import { computeFramePlacement } from './geometry.js';
 
+const MAX_CANVAS_DIMENSION = 32767;
+const MAX_CANVAS_AREA = 268435456;
+
 function requirePositiveNumber(value, name) {
 	 if (!Number.isFinite(value) || value <= 0) {
 		 throw new RangeError(`${name} must be a positive number`);
 	 }
 
 	 return value;
+}
+
+function getPhysicalDimensions({ width, height, ratio }) {
+	 const physicalWidth = Math.ceil(width * ratio);
+	 const physicalHeight = Math.ceil(height * ratio);
+
+	 if (!Number.isFinite(physicalWidth) || !Number.isFinite(physicalHeight)
+		 || physicalWidth <= 0 || physicalHeight <= 0) {
+		 throw new RangeError('canvas dimensions must be finite positive integers');
+	 }
+
+	 if (physicalWidth > MAX_CANVAS_DIMENSION) {
+		 throw new RangeError(`canvas width ${physicalWidth} exceeds maximum ${MAX_CANVAS_DIMENSION}`);
+	 }
+
+	 if (physicalHeight > MAX_CANVAS_DIMENSION) {
+		 throw new RangeError(`canvas height ${physicalHeight} exceeds maximum ${MAX_CANVAS_DIMENSION}`);
+	 }
+
+	 const area = physicalWidth * physicalHeight;
+	 if (area > MAX_CANVAS_AREA) {
+		 throw new RangeError(`canvas area ${area} exceeds maximum ${MAX_CANVAS_AREA}`);
+	 }
+
+	 return { physicalWidth, physicalHeight };
 }
 
 function requireFrames(value) {
@@ -28,10 +56,11 @@ export async function stitchFrames({
 	 const height = requirePositiveNumber(Number(documentHeight), 'document height');
 	 const viewport = requirePositiveNumber(Number(viewportHeight), 'viewport height');
 	 const ratio = requirePositiveNumber(Number(pixelRatio), 'pixel ratio');
+	 const { physicalWidth, physicalHeight } = getPhysicalDimensions({ width, height, ratio });
 
 	 let canvas;
 	 try {
-		 canvas = new OffscreenCanvas(width * ratio, height * ratio);
+		 canvas = new OffscreenCanvas(physicalWidth, physicalHeight);
 	 } catch (error) {
 		 throw new Error(`Unable to allocate capture canvas: ${error instanceof Error ? error.message : String(error)}`);
 	 }
@@ -56,8 +85,8 @@ export async function stitchFrames({
 				 });
 
 			 if (placement.height > 0) {
-				 const sourceY = placement.sourceY * ratio;
-				 const sourceHeight = placement.height * ratio;
+				 const sourceY = Math.floor(placement.sourceY * ratio);
+				 const sourceHeight = Math.ceil(placement.height * ratio);
 				 context.drawImage(
 					 bitmap,
 					 0,
@@ -65,8 +94,8 @@ export async function stitchFrames({
 					 bitmap.width,
 					 sourceHeight,
 					 0,
-					 placement.destinationY * ratio,
-					 width * ratio,
+					 Math.floor(placement.destinationY * ratio),
+					 physicalWidth,
 					 sourceHeight
 				 );
 			 }
