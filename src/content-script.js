@@ -54,11 +54,11 @@ if (!globalThis[listenerInstalledKey]) {
 	chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		let response;
 		if (message?.type === MESSAGE_TYPES.GET_METRICS) {
-			response = Promise.resolve(getMetrics());
+			response = Promise.resolve().then(getMetrics);
 		} else if (message?.type === MESSAGE_TYPES.SCROLL_TO) {
-			response = scrollTo(message.scrollY);
+			response = Promise.resolve().then(() => scrollTo(message.scrollY));
 		} else if (message?.type === MESSAGE_TYPES.RESTORE_SCROLL) {
-			response = Promise.resolve(restoreScroll(message));
+			response = Promise.resolve().then(() => restoreScroll(message));
 		} else {
 			return false;
 		}

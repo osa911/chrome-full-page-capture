@@ -114,3 +114,29 @@ it('does not register duplicate listeners when a later capture reinjects the scr
 
 	expect(addListener).toHaveBeenCalledTimes(1);
 });
+
+it('returns a failure response when metric collection throws synchronously', async () => {
+	let listener;
+	vi.stubGlobal('window', {
+		get innerWidth() {
+			throw new Error('Metric collection failed.');
+		}
+	});
+	vi.stubGlobal('chrome', {
+		runtime: {
+			onMessage: {
+				addListener(callback) {
+					listener = callback;
+				}
+			}
+		}
+	});
+
+	await import('../src/content-script.js');
+
+	const response = new Promise((resolve) => {
+		expect(() => listener({ type: 'GET_METRICS' }, {}, resolve)).not.toThrow();
+	});
+
+	expect(await response).toEqual({ error: 'Metric collection failed.' });
+});

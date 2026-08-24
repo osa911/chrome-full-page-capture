@@ -13,6 +13,63 @@ function wait(milliseconds) {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function getContentScriptResponse(response) {
+	if (response !== null && typeof response === 'object' && 'error' in response) {
+		const message = response.error;
+		throw new Error(typeof message === 'string' && message.length > 0
+			? message
+			: 'The page control script failed.');
+	}
+
+	return response;
+}
+
+function isPositiveNumber(value) {
+	return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function isScrollCoordinate(value) {
+	return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function getMetrics(response) {
+	const metrics = getContentScriptResponse(response);
+	if (metrics === null || typeof metrics !== 'object'
+		|| !isPositiveNumber(metrics.viewportWidth)
+		|| !isPositiveNumber(metrics.viewportHeight)
+		|| !isPositiveNumber(metrics.documentWidth)
+		|| !isPositiveNumber(metrics.documentHeight)
+		|| !isPositiveNumber(metrics.pixelRatio)
+		|| !isScrollCoordinate(metrics.scrollX)
+		|| !isScrollCoordinate(metrics.scrollY)) {
+		throw new Error('Capture metrics are invalid.');
+	}
+
+	return metrics;
+}
+
+function getScrollPosition(response) {
+	const position = getContentScriptResponse(response);
+	if (position === null || typeof position !== 'object'
+		|| !isScrollCoordinate(position.scrollX)
+		|| !isScrollCoordinate(position.scrollY)) {
+		throw new Error('Capture scroll position is invalid.');
+	}
+
+	return position;
+}
+
+function getRestoration(response) {
+	const result = getContentScriptResponse(response);
+	if (result === null || typeof result !== 'object' || result.restored !== true) {
+		throw new Error('The page did not confirm scroll restoration.');
+	}
+}
+
+async function sendContentScriptMessage(tabId, message) {
+	return getContentScriptResponse(await chrome.tabs.sendMessage(tabId, message));
+}
+
 async function blobToDataUrl(blob) {
 	const bytes = new Uint8Array(await blob.arrayBuffer());
 	let binary = '';
@@ -27,10 +84,10 @@ async function blobToDataUrl(blob) {
 async function restoreScroll(tabId, initialScroll, captureError) {
 	try {
 		await chrome.tabs.get(tabId);
-		await chrome.tabs.sendMessage(tabId, {
+		getRestoration(await sendContentScriptMessage(tabId, {
 			type: MESSAGE_TYPES.RESTORE_SCROLL,
 			...initialScroll
-		});
+		}));
 	} catch (error) {
 		if (!captureError) {
 			throw new Error(`Unable to restore the page scroll position: ${getErrorMessage(error)}`);
@@ -62,7 +119,7 @@ export async function captureTab(tabId, format) {
 		target: { tabId },
 		files: ['content-script.js']
 	});
-	const metrics = await chrome.tabs.sendMessage(tabId, { type: MESSAGE_TYPES.GET_METRICS });
+	const metrics = getMetrics(await sendContentScriptMessage(tabId, { type: MESSAGE_TYPES.GET_METRICS }));
 	const initialScroll = { scrollX: metrics.scrollX, scrollY: metrics.scrollY };
 	const positions = createCapturePositions({
 		documentHeight: metrics.documentHeight,
@@ -73,10 +130,10 @@ export async function captureTab(tabId, format) {
 
 	try {
 		for (const scrollY of positions) {
-			const actualPosition = await chrome.tabs.sendMessage(tabId, {
+			const actualPosition = getScrollPosition(await sendContentScriptMessage(tabId, {
 				type: MESSAGE_TYPES.SCROLL_TO,
 				scrollY
-			});
+			}));
 			await wait(CAPTURE_INTERVAL_MS);
 
 			const [activeTab] = await chrome.tabs.query({ active: true, windowId: tab.windowId });

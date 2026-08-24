@@ -18,10 +18,14 @@ const metrics = Object.freeze({
 	scrollY: 20
 });
 
-function installChrome({ activeTabId = 7 } = {}) {
+function installChrome({ activeTabId = 7, responseForMessage } = {}) {
 	let listener;
 	const runtimeSendMessage = vi.fn().mockResolvedValue(undefined);
 	const tabSendMessage = vi.fn(async (_tabId, message) => {
+		const customResponse = responseForMessage?.(message);
+		if (customResponse !== undefined) {
+			return customResponse;
+		}
 		if (message.type === 'GET_METRICS') {
 			return metrics;
 		}
@@ -139,5 +143,87 @@ it('cancels if the original window activates another tab and still restores the 
 		scrollX: 10,
 		scrollY: 20
 	});
+	expect(chrome.downloads.download).not.toHaveBeenCalled();
+});
+
+it('does not capture or download when the content script reports a scroll error', async () => {
+	vi.useFakeTimers();
+	const { chrome } = installChrome({
+		responseForMessage(message) {
+			return message.type === 'SCROLL_TO' ? { error: 'Page scroll failed.' } : undefined;
+		}
+	});
+	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+	const { captureTab } = await import('../src/service-worker.js');
+	const capture = captureTab(7, 'png');
+	void capture.catch(() => {});
+	await vi.advanceTimersByTimeAsync(1500);
+
+	await expect(capture).rejects.toThrow('Page scroll failed.');
+	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
+	expect(stitchFrames).not.toHaveBeenCalled();
+	expect(chrome.downloads.download).not.toHaveBeenCalled();
+});
+
+it('does not capture or download when metrics are malformed', async () => {
+	vi.useFakeTimers();
+	const { chrome } = installChrome({
+		responseForMessage(message) {
+			return message.type === 'GET_METRICS' ? { ...metrics, documentWidth: 0 } : undefined;
+		}
+	});
+	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+	const { captureTab } = await import('../src/service-worker.js');
+	const capture = captureTab(7, 'png');
+	void capture.catch(() => {});
+	await vi.advanceTimersByTimeAsync(1500);
+
+	await expect(capture).rejects.toThrow('Capture metrics are invalid.');
+	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
+	expect(stitchFrames).not.toHaveBeenCalled();
+	expect(chrome.downloads.download).not.toHaveBeenCalled();
+});
+
+it('does not capture or download when the content script returns invalid scroll coordinates', async () => {
+	vi.useFakeTimers();
+	const { chrome } = installChrome({
+		responseForMessage(message) {
+			return message.type === 'SCROLL_TO' ? { scrollX: 10, scrollY: Number.NaN } : undefined;
+		}
+	});
+	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+	const { captureTab } = await import('../src/service-worker.js');
+	const capture = captureTab(7, 'png');
+	void capture.catch(() => {});
+	await vi.advanceTimersByTimeAsync(1500);
+
+	await expect(capture).rejects.toThrow('Capture scroll position is invalid.');
+	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
+	expect(stitchFrames).not.toHaveBeenCalled();
+	expect(chrome.downloads.download).not.toHaveBeenCalled();
+});
+
+it('does not download when the content script reports a restoration error', async () => {
+	vi.useFakeTimers();
+	const { chrome } = installChrome({
+		responseForMessage(message) {
+			if (message.type === 'GET_METRICS') {
+				return { ...metrics, documentHeight: 600 };
+			}
+			return message.type === 'RESTORE_SCROLL' ? { error: 'Page restoration failed.' } : undefined;
+		}
+	});
+	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+	const { captureTab } = await import('../src/service-worker.js');
+	const capture = captureTab(7, 'png');
+	void capture.catch(() => {});
+	await vi.advanceTimersByTimeAsync(500);
+
+	await expect(capture).rejects.toThrow('Page restoration failed.');
+	expect(stitchFrames).not.toHaveBeenCalled();
 	expect(chrome.downloads.download).not.toHaveBeenCalled();
 });
