@@ -216,7 +216,7 @@ it('crops the overlap from the final frame', () => {
 		 scrollY: 1200,
 		 viewportHeight: 900,
 		 documentHeight: 2100
-	 })).toEqual({ sourceY: 300, destinationY: 1800, height: 300 });
+	 })).toEqual({ sourceY: 600, destinationY: 1800, height: 300 });
 });
 ```
 
@@ -424,15 +424,19 @@ Wrap the full capture loop in `try/finally`. If the tab still exists, send `REST
 
 - [ ] **Step 5: Stitch and download only after capture succeeds**
 
-Call `stitchFrames` after the final frame arrives. For PNG, download the PNG blob. For PDF, call `createPdfFromPng` and download the PDF blob. Use `chrome.downloads.download({ url: URL.createObjectURL(blob), filename, saveAs: true })`. Revoke the object URL after the download starts.
+Call `stitchFrames` after the final frame arrives. For PNG, download the PNG blob. For PDF, call `createPdfFromPng` and download the PDF blob. Convert the selected blob to a `data:` URL with base64 encoding and call `chrome.downloads.download({ url: dataUrl, filename, saveAs: true })`. Do not rely on `URL.createObjectURL` in the service worker.
 
-- [ ] **Step 6: Run the unit suite**
+- [ ] **Step 6: Abort if the user changes tabs during capture**
+
+Before each `captureVisibleTab` call, query the active tab in the original window. If its ID is not the captured tab ID, throw `Capture canceled because the active tab changed.` The `finally` block must still attempt to restore the original scroll position in the original tab.
+
+- [ ] **Step 7: Run the unit suite**
 
 Run: `npm test`
 
 Expected: PASS for geometry, message validation, stitcher validation, and PDF export.
 
-- [ ] **Step 7: Commit the runtime coordinator**
+- [ ] **Step 8: Commit the runtime coordinator**
 
 Run:
 
