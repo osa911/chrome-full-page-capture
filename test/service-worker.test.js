@@ -20,6 +20,12 @@ const metrics = Object.freeze({
 
 function installChrome({ activeTabId = 7, responseForMessage } = {}) {
 	let listener;
+	const captureTimes = [];
+	const captureResults = [
+		'data:image/png;base64,first',
+		'data:image/png;base64,second',
+		'data:image/png;base64,third'
+	];
 	const runtimeSendMessage = vi.fn().mockResolvedValue(undefined);
 	const tabSendMessage = vi.fn(async (_tabId, message) => {
 		const customResponse = responseForMessage?.(message);
@@ -45,10 +51,11 @@ function installChrome({ activeTabId = 7, responseForMessage } = {}) {
 		},
 		scripting: { executeScript: vi.fn().mockResolvedValue(undefined) },
 		tabs: {
-			captureVisibleTab: vi.fn()
-				.mockResolvedValueOnce('data:image/png;base64,first')
-				.mockResolvedValueOnce('data:image/png;base64,second')
-				.mockResolvedValueOnce('data:image/png;base64,third'),
+			MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND: 2,
+			captureVisibleTab: vi.fn().mockImplementation(async () => {
+				captureTimes.push(Date.now());
+				return captureResults.shift();
+			}),
 			get: vi.fn().mockResolvedValue({ id: 7, windowId: 4 }),
 			query: vi.fn().mockResolvedValue([{ id: activeTabId, windowId: 4 }]),
 			sendMessage: tabSendMessage
@@ -56,7 +63,7 @@ function installChrome({ activeTabId = 7, responseForMessage } = {}) {
 	};
 
 	vi.stubGlobal('chrome', chrome);
-	return { chrome, getListener: () => listener };
+	return { chrome, captureTimes, getListener: () => listener };
 }
 
 afterEach(() => {
@@ -68,14 +75,14 @@ afterEach(() => {
 
 it('captures the active tab, restores its scroll position, and downloads the stitched PNG', async () => {
 	vi.useFakeTimers();
-	const { chrome, getListener } = installChrome();
+	const { chrome, captureTimes, getListener } = installChrome();
 	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
 
 	await import('../src/service-worker.js');
 	const response = new Promise((resolve) => {
 		expect(getListener()({ type: 'START_CAPTURE', format: 'png' }, {}, resolve)).toBe(true);
 	});
-	await vi.advanceTimersByTimeAsync(1500);
+	await vi.advanceTimersByTimeAsync(1650);
 
 	expect(await response).toEqual({ downloadId: 42, filename: 'full-page-capture.png' });
 	expect(chrome.scripting.executeScript).toHaveBeenCalledWith({
@@ -83,6 +90,7 @@ it('captures the active tab, restores its scroll position, and downloads the sti
 		files: ['content-script.js']
 	});
 	expect(chrome.tabs.captureVisibleTab).toHaveBeenCalledTimes(3);
+	expect(captureTimes[2] - captureTimes[0]).toBeGreaterThanOrEqual(1000);
 	expect(stitchFrames).toHaveBeenCalledWith({
 		frames: [
 			{ dataUrl: 'data:image/png;base64,first', scrollY: 0 },
@@ -115,7 +123,7 @@ it('exports a PDF only after every frame succeeds', async () => {
 
 	const { captureTab } = await import('../src/service-worker.js');
 	const capture = captureTab(7, 'pdf');
-	await vi.advanceTimersByTimeAsync(1500);
+	await vi.advanceTimersByTimeAsync(1650);
 
 	expect(await capture).toEqual({ downloadId: 42, filename: 'full-page-capture.pdf' });
 	expect(createPdfFromPng).toHaveBeenCalledWith(png);
@@ -140,7 +148,7 @@ it('cancels if the original window activates another tab and still restores the 
 	const { captureTab } = await import('../src/service-worker.js');
 	const capture = captureTab(7, 'png');
 	const rejection = expect(capture).rejects.toThrow('Capture canceled because the active tab changed.');
-	await vi.advanceTimersByTimeAsync(500);
+	await vi.advanceTimersByTimeAsync(550);
 
 	await rejection;
 	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
@@ -164,7 +172,7 @@ it('does not capture or download when the content script reports a scroll error'
 	const { captureTab } = await import('../src/service-worker.js');
 	const capture = captureTab(7, 'png');
 	void capture.catch(() => {});
-	await vi.advanceTimersByTimeAsync(1500);
+	await vi.advanceTimersByTimeAsync(1650);
 
 	await expect(capture).rejects.toThrow('Page scroll failed.');
 	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
@@ -184,7 +192,7 @@ it('does not capture or download when metrics are malformed', async () => {
 	const { captureTab } = await import('../src/service-worker.js');
 	const capture = captureTab(7, 'png');
 	void capture.catch(() => {});
-	await vi.advanceTimersByTimeAsync(1500);
+	await vi.advanceTimersByTimeAsync(1650);
 
 	await expect(capture).rejects.toThrow('Capture metrics are invalid.');
 	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
@@ -206,7 +214,7 @@ it('rejects pages wider than the viewport before capture', async () => {
 	const { captureTab } = await import('../src/service-worker.js');
 	const capture = captureTab(7, 'png');
 	void capture.catch(() => {});
-	await vi.advanceTimersByTimeAsync(1500);
+	await vi.advanceTimersByTimeAsync(1650);
 
 	await expect(capture).rejects.toThrow('Full-page capture does not support pages wider than the viewport.');
 	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
@@ -226,9 +234,9 @@ it('downloads and responds when runtime notifications cannot be delivered', asyn
 	});
 	const terminalResult = Promise.race([
 		response,
-		new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), 1600))
+		new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), 1800))
 	]);
-	await vi.advanceTimersByTimeAsync(1600);
+	await vi.advanceTimersByTimeAsync(1800);
 
 	expect(await terminalResult).toEqual({ downloadId: 42, filename: 'full-page-capture.png' });
 	expect(chrome.downloads.download).toHaveBeenCalledTimes(1);
@@ -259,7 +267,7 @@ it('rejects a concurrent capture request while the first capture is running', as
 	await vi.advanceTimersByTimeAsync(1);
 
 	expect(await secondResult).toEqual({ error: 'Capture already running.' });
-	await vi.advanceTimersByTimeAsync(499);
+	await vi.advanceTimersByTimeAsync(549);
 	expect(await firstResponse).toEqual({ downloadId: 42, filename: 'full-page-capture.png' });
 	expect(chrome.tabs.captureVisibleTab).toHaveBeenCalledTimes(1);
 	expect(chrome.downloads.download).toHaveBeenCalledTimes(1);
@@ -277,7 +285,7 @@ it('does not capture or download when the content script returns invalid scroll 
 	const { captureTab } = await import('../src/service-worker.js');
 	const capture = captureTab(7, 'png');
 	void capture.catch(() => {});
-	await vi.advanceTimersByTimeAsync(1500);
+	await vi.advanceTimersByTimeAsync(1650);
 
 	await expect(capture).rejects.toThrow('Capture scroll position is invalid.');
 	expect(chrome.tabs.captureVisibleTab).not.toHaveBeenCalled();
@@ -300,7 +308,7 @@ it('does not download when the content script reports a restoration error', asyn
 	const { captureTab } = await import('../src/service-worker.js');
 	const capture = captureTab(7, 'png');
 	void capture.catch(() => {});
-	await vi.advanceTimersByTimeAsync(500);
+	await vi.advanceTimersByTimeAsync(550);
 
 	await expect(capture).rejects.toThrow('Page restoration failed.');
 	expect(stitchFrames).not.toHaveBeenCalled();

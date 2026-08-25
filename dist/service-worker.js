@@ -19871,7 +19871,14 @@
   }
 
   // src/service-worker.js
-  var CAPTURE_INTERVAL_MS = 500;
+  var DEFAULT_CAPTURE_CALLS_PER_SECOND = 2;
+  var CAPTURE_INTERVAL_SAFETY_MARGIN_MS = 50;
+  function getCaptureIntervalMs(tabsApi) {
+    const maxCallsPerSecond = tabsApi.MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND;
+    const callsPerSecond = Number.isFinite(maxCallsPerSecond) && maxCallsPerSecond > 0 ? maxCallsPerSecond : DEFAULT_CAPTURE_CALLS_PER_SECOND;
+    return Math.ceil(1e3 / callsPerSecond) + CAPTURE_INTERVAL_SAFETY_MARGIN_MS;
+  }
+  var CAPTURE_INTERVAL_MS = getCaptureIntervalMs(chrome.tabs);
   var captureInFlight = false;
   function getErrorMessage(error2) {
     return error2 instanceof Error ? error2.message : String(error2);
@@ -20063,10 +20070,10 @@
 tslib/tslib.es6.js:
   (*! *****************************************************************************
   Copyright (c) Microsoft Corporation.
-  
+
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted.
-  
+
   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
   REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
   AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,

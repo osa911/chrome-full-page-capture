@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 
 await rm('dist', { recursive: true, force: true });
 await mkdir('dist', { recursive: true });
@@ -21,3 +21,9 @@ await build({
 	platform: 'browser',
 	logLevel: 'info'
 });
+
+for (const name of Object.keys(entryPoints)) {
+	const outputPath = `dist/${name}.js`;
+	const bundle = await readFile(outputPath, 'utf8');
+	await writeFile(outputPath, bundle.replace(/[ \t]+$/gm, ''));
+}

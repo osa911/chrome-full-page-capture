@@ -3,7 +3,19 @@ import { createPdfFromPng } from './capture/pdf-exporter.js';
 import { stitchFrames } from './capture/stitcher.js';
 import { isCaptureRequest, MESSAGE_TYPES } from './shared/messages.js';
 
-const CAPTURE_INTERVAL_MS = 500;
+const DEFAULT_CAPTURE_CALLS_PER_SECOND = 2;
+const CAPTURE_INTERVAL_SAFETY_MARGIN_MS = 50;
+
+function getCaptureIntervalMs(tabsApi) {
+	const maxCallsPerSecond = tabsApi.MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND;
+	const callsPerSecond = Number.isFinite(maxCallsPerSecond) && maxCallsPerSecond > 0
+		? maxCallsPerSecond
+		: DEFAULT_CAPTURE_CALLS_PER_SECOND;
+
+	return Math.ceil(1000 / callsPerSecond) + CAPTURE_INTERVAL_SAFETY_MARGIN_MS;
+}
+
+const CAPTURE_INTERVAL_MS = getCaptureIntervalMs(chrome.tabs);
 
 let captureInFlight = false;
 
