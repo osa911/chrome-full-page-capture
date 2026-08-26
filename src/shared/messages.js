@@ -14,9 +14,11 @@ export function isCaptureRequest(value) {
 	 }
 
 	 const keys = Object.keys(value);
-	 return keys.length === 2
-		 && keys.includes('type')
+	 const hasRequiredKeys = keys.includes('type')
 		 && keys.includes('format')
 		 && value.type === MESSAGE_TYPES.START_CAPTURE
 		 && (value.format === 'png' || value.format === 'pdf');
+	return hasRequiredKeys
+		 && (keys.length === 2
+			|| (keys.length === 3 && keys.includes('filename') && typeof value.filename === 'string'));
 }

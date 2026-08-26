@@ -1,6 +1,7 @@
 import { createCapturePositions } from './capture/geometry.js';
 import { createPdfFromPng } from './capture/pdf-exporter.js';
 import { stitchFrames } from './capture/stitcher.js';
+import { createCaptureFilename } from './shared/filenames.js';
 import { isCaptureRequest, MESSAGE_TYPES } from './shared/messages.js';
 
 const DEFAULT_CAPTURE_CALLS_PER_SECOND = 2;
@@ -117,8 +118,8 @@ async function restoreScroll(tabId, initialScroll, captureError) {
 	}
 }
 
-async function downloadBlob(blob, format) {
-	const filename = `full-page-capture.${format}`;
+async function downloadBlob(blob, format, filenameStem) {
+	const filename = createCaptureFilename(filenameStem || 'capture', format);
 	const downloadId = await chrome.downloads.download({
 		url: await blobToDataUrl(blob),
 		filename,
@@ -127,7 +128,7 @@ async function downloadBlob(blob, format) {
 	return { downloadId, filename };
 }
 
-async function captureTabOnce(tabId, format) {
+async function captureTabOnce(tabId, format, filenameStem) {
 	if (format !== 'png' && format !== 'pdf') {
 		throw new Error('Capture format must be png or pdf.');
 	}
@@ -201,29 +202,29 @@ async function captureTabOnce(tabId, format) {
 		});
 		output = await createPdfFromPng(png);
 	}
-	return downloadBlob(output, format);
+	return downloadBlob(output, format, filenameStem);
 }
 
-export async function captureTab(tabId, format) {
+export async function captureTab(tabId, format, filenameStem) {
 	if (captureInFlight) {
 		throw new Error('Capture already running.');
 	}
 
 	captureInFlight = true;
 	try {
-		return await captureTabOnce(tabId, format);
+		return await captureTabOnce(tabId, format, filenameStem);
 	} finally {
 		captureInFlight = false;
 	}
 }
 
-async function startCapture(format) {
+async function startCapture(format, filenameStem) {
 	const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 	if (!Number.isInteger(tab?.id)) {
 		throw new Error('No active tab is available.');
 	}
 
-	return captureTab(tab.id, format);
+	return captureTab(tab.id, format, filenameStem || tab.title || 'capture');
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -231,7 +232,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		return false;
 	}
 
-	void startCapture(message.format).then(
+	void startCapture(message.format, message.filename).then(
 		(result) => {
 			void notifyPopup({ type: MESSAGE_TYPES.CAPTURE_COMPLETE, ...result });
 			sendResponse(result);

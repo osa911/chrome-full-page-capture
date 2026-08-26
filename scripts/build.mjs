@@ -3,9 +3,13 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 
 await rm('dist', { recursive: true, force: true });
 await mkdir('dist', { recursive: true });
+await mkdir('dist/icons', { recursive: true });
 await cp('src/manifest.json', 'dist/manifest.json');
 await cp('src/popup.html', 'dist/popup.html');
 await cp('src/popup.css', 'dist/popup.css');
+for (const size of [16, 32, 48, 128]) {
+	await cp(`src/icons/icon${size}.png`, `dist/icons/icon${size}.png`);
+}
 
 const entryPoints = {
 	'popup': 'src/popup.js',

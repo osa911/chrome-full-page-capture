@@ -9,6 +9,9 @@
 <body>
   <main>
     <h1>Full-page capture</h1>
+    <label for="filename">File name</label>
+    <input id="filename" type="text" maxlength="80" autocomplete="off" placeholder="Short title or description">
+    <p class="hint">The page title is used by default. A timestamp is added automatically.</p>
     <button id="png" type="button">Download PNG</button>
     <button id="pdf" type="button">Download PDF</button>
     <p id="status" role="status"></p>
