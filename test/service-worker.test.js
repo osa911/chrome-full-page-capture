@@ -84,7 +84,10 @@ it('captures the active tab, restores its scroll position, and downloads the sti
 	});
 	await vi.advanceTimersByTimeAsync(1650);
 
-	expect(await response).toEqual({ downloadId: 42, filename: 'full-page-capture.png' });
+	expect(await response).toEqual(expect.objectContaining({
+		downloadId: 42,
+		filename: expect.stringMatching(/^capture_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.png$/)
+	}));
 	expect(chrome.scripting.executeScript).toHaveBeenCalledWith({
 		target: { tabId: 7 },
 		files: ['content-script.js']
@@ -107,11 +110,13 @@ it('captures the active tab, restores its scroll position, and downloads the sti
 		scrollX: 10,
 		scrollY: 20
 	});
-	expect(chrome.downloads.download).toHaveBeenCalledWith({
+	expect(chrome.downloads.download).toHaveBeenCalledWith(expect.objectContaining({
 		url: 'data:image/png;base64,cG5n',
-		filename: 'full-page-capture.png',
 		saveAs: true
-	});
+	}));
+	expect(chrome.downloads.download.mock.calls[0][0].filename).toMatch(
+		/^capture_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.png$/
+	);
 });
 
 it('exports a PDF only after every frame succeeds', async () => {
@@ -125,7 +130,10 @@ it('exports a PDF only after every frame succeeds', async () => {
 	const capture = captureTab(7, 'pdf');
 	await vi.advanceTimersByTimeAsync(1650);
 
-	expect(await capture).toEqual({ downloadId: 42, filename: 'full-page-capture.pdf' });
+	expect(await capture).toEqual(expect.objectContaining({
+		downloadId: 42,
+		filename: expect.stringMatching(/^capture_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.pdf$/)
+	}));
 	expect(createPdfFromPng).toHaveBeenCalledWith(png);
 	expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
 		type: 'CAPTURE_PROGRESS',
@@ -133,9 +141,35 @@ it('exports a PDF only after every frame succeeds', async () => {
 		total: 3,
 		exporting: true
 	});
-	expect(chrome.downloads.download).toHaveBeenCalledWith({
+	expect(chrome.downloads.download).toHaveBeenCalledWith(expect.objectContaining({
 		url: 'data:application/pdf;base64,cGRm',
-		filename: 'full-page-capture.pdf',
+		saveAs: true
+	}));
+	expect(chrome.downloads.download.mock.calls[0][0].filename).toMatch(
+		/^capture_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.pdf$/
+	);
+});
+
+it('uses a sanitized filename and timestamp for the downloaded capture', async () => {
+	vi.useFakeTimers();
+	vi.setSystemTime(new Date('2026-08-26T12:34:56Z'));
+	const { chrome } = installChrome({
+		responseForMessage(message) {
+			return message.type === 'GET_METRICS'
+				? { ...metrics, documentHeight: 600 }
+				: undefined;
+		}
+	});
+	stitchFrames.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+	const { captureTab } = await import('../src/service-worker.js');
+	const capture = captureTab(7, 'png', ' Project: notes / intro ');
+	await vi.advanceTimersByTimeAsync(550);
+
+	expect(await capture).toEqual({ downloadId: 42, filename: 'Project - notes - intro_2026-08-26_12-34-56-550.png' });
+	expect(chrome.downloads.download).toHaveBeenCalledWith({
+		url: 'data:image/png;base64,cG5n',
+		filename: 'Project - notes - intro_2026-08-26_12-34-56-550.png',
 		saveAs: true
 	});
 });
@@ -238,7 +272,10 @@ it('downloads and responds when runtime notifications cannot be delivered', asyn
 	]);
 	await vi.advanceTimersByTimeAsync(1800);
 
-	expect(await terminalResult).toEqual({ downloadId: 42, filename: 'full-page-capture.png' });
+	expect(await terminalResult).toEqual(expect.objectContaining({
+		downloadId: 42,
+		filename: expect.stringMatching(/^capture_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.png$/)
+	}));
 	expect(chrome.downloads.download).toHaveBeenCalledTimes(1);
 });
 
@@ -268,7 +305,10 @@ it('rejects a concurrent capture request while the first capture is running', as
 
 	expect(await secondResult).toEqual({ error: 'Capture already running.' });
 	await vi.advanceTimersByTimeAsync(549);
-	expect(await firstResponse).toEqual({ downloadId: 42, filename: 'full-page-capture.png' });
+	expect(await firstResponse).toEqual(expect.objectContaining({
+		downloadId: 42,
+		filename: expect.stringMatching(/^capture_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.png$/)
+	}));
 	expect(chrome.tabs.captureVisibleTab).toHaveBeenCalledTimes(1);
 	expect(chrome.downloads.download).toHaveBeenCalledTimes(1);
 });

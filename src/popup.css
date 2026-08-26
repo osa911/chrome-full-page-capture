@@ -20,6 +20,32 @@ h1 {
 	font-size: 18px;
 }
 
+label {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+input {
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 38px;
+	padding: 8px 10px;
+	border: 1px solid #777;
+	border-radius: 4px;
+	font: inherit;
+}
+
+input:focus-visible {
+	outline: 3px solid #1456cc;
+	outline-offset: 2px;
+}
+
+.hint {
+	margin: -2px 0 4px;
+	color: #555;
+	font-size: 12px;
+}
+
 button {
 	min-height: 44px;
 	padding: 8px 12px;
@@ -42,6 +68,10 @@ button:focus-visible {
 
 button:disabled {
 	cursor: wait;
+	opacity: 0.6;
+}
+
+input:disabled {
 	opacity: 0.6;
 }
 

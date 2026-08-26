@@ -19852,6 +19852,23 @@
     }
   }
 
+  // src/shared/filenames.js
+  var FALLBACK_FILENAME_STEM = "capture";
+  var MAX_FILENAME_STEM_LENGTH = 80;
+  var INVALID_FILENAME_CHARACTERS = /[<>:"/\\|?*\u0000-\u001F]/g;
+  function sanitizeFilenameStem(value) {
+    const candidate = typeof value === "string" ? value : "";
+    const sanitized = candidate.replace(INVALID_FILENAME_CHARACTERS, " - ").replace(/\s+/g, " ").trim().slice(0, MAX_FILENAME_STEM_LENGTH).replace(/^[. ]+|[. ]+$/g, "").trim();
+    return sanitized || FALLBACK_FILENAME_STEM;
+  }
+  function createCaptureFilename(value, format, date = /* @__PURE__ */ new Date()) {
+    if (format !== "png" && format !== "pdf") {
+      throw new Error("Capture format must be png or pdf.");
+    }
+    const timestamp = date.toISOString().replace("T", "_").replace(/:/g, "-").replace(/\.\d{3}Z$/, (milliseconds) => `-${milliseconds.slice(1, -1)}`);
+    return `${sanitizeFilenameStem(value)}_${timestamp}.${format}`;
+  }
+
   // src/shared/messages.js
   var MESSAGE_TYPES = Object.freeze({
     START_CAPTURE: "START_CAPTURE",
@@ -19867,7 +19884,8 @@
       return false;
     }
     const keys = Object.keys(value);
-    return keys.length === 2 && keys.includes("type") && keys.includes("format") && value.type === MESSAGE_TYPES.START_CAPTURE && (value.format === "png" || value.format === "pdf");
+    const hasRequiredKeys = keys.includes("type") && keys.includes("format") && value.type === MESSAGE_TYPES.START_CAPTURE && (value.format === "png" || value.format === "pdf");
+    return hasRequiredKeys && (keys.length === 2 || keys.length === 3 && keys.includes("filename") && typeof value.filename === "string");
   }
 
   // src/service-worker.js
@@ -19950,8 +19968,8 @@
       }
     }
   }
-  async function downloadBlob(blob, format) {
-    const filename = `full-page-capture.${format}`;
+  async function downloadBlob(blob, format, filenameStem) {
+    const filename = createCaptureFilename(filenameStem || "capture", format);
     const downloadId = await chrome.downloads.download({
       url: await blobToDataUrl(blob),
       filename,
@@ -19959,7 +19977,7 @@
     });
     return { downloadId, filename };
   }
-  async function captureTabOnce(tabId, format) {
+  async function captureTabOnce(tabId, format, filenameStem) {
     if (format !== "png" && format !== "pdf") {
       throw new Error("Capture format must be png or pdf.");
     }
@@ -20027,31 +20045,31 @@
       });
       output = await createPdfFromPng(png);
     }
-    return downloadBlob(output, format);
+    return downloadBlob(output, format, filenameStem);
   }
-  async function captureTab(tabId, format) {
+  async function captureTab(tabId, format, filenameStem) {
     if (captureInFlight) {
       throw new Error("Capture already running.");
     }
     captureInFlight = true;
     try {
-      return await captureTabOnce(tabId, format);
+      return await captureTabOnce(tabId, format, filenameStem);
     } finally {
       captureInFlight = false;
     }
   }
-  async function startCapture(format) {
+  async function startCapture(format, filenameStem) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!Number.isInteger(tab?.id)) {
       throw new Error("No active tab is available.");
     }
-    return captureTab(tab.id, format);
+    return captureTab(tab.id, format, filenameStem || tab.title || "capture");
   }
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!isCaptureRequest(message)) {
       return false;
     }
-    void startCapture(message.format).then(
+    void startCapture(message.format, message.filename).then(
       (result) => {
         void notifyPopup({ type: MESSAGE_TYPES.CAPTURE_COMPLETE, ...result });
         sendResponse(result);

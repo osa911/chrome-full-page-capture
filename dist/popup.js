@@ -18,16 +18,22 @@
     }
     return element;
   }
-  function initializePopup(document2, runtime) {
+  function initializePopup(document2, runtime, tabs) {
+    const filenameInput = getElement(document2, "#filename");
     const pngButton = getElement(document2, "#png");
     const pdfButton = getElement(document2, "#pdf");
     const status = getElement(document2, "#status");
     let selectedFormat = null;
+    let filenameEdited = false;
+    filenameInput.addEventListener("input", () => {
+      filenameEdited = true;
+    });
     function setStatus(message, state = "") {
       status.textContent = message;
       status.dataset.state = state;
     }
     function setBusy(isBusy) {
+      filenameInput.disabled = isBusy;
       pngButton.disabled = isBusy;
       pdfButton.disabled = isBusy;
     }
@@ -42,7 +48,11 @@
       setStatus("Preparing capture\u2026");
       setBusy(true);
       try {
-        await runtime.sendMessage({ type: MESSAGE_TYPES.START_CAPTURE, format });
+        await runtime.sendMessage({
+          type: MESSAGE_TYPES.START_CAPTURE,
+          format,
+          filename: filenameInput.value.trim() || "capture"
+        });
       } catch (error) {
         showError(error instanceof Error ? error.message : String(error));
       }
@@ -73,8 +83,17 @@
           break;
       }
     });
+    filenameInput.value = "capture";
+    if (tabs?.query) {
+      void tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+        if (!filenameEdited && typeof tab?.title === "string" && tab.title.trim()) {
+          filenameInput.value = tab.title;
+        }
+      }).catch(() => {
+      });
+    }
   }
   if (typeof document !== "undefined" && typeof chrome !== "undefined") {
-    initializePopup(document, chrome.runtime);
+    initializePopup(document, chrome.runtime, chrome.tabs);
   }
 })();

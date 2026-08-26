@@ -11,7 +11,8 @@ Save the active webpage as a long PNG or an image-based PDF. The extension proce
 5. Click **Load unpacked**.
 6. Select the `dist` directory.
 7. Open a normal webpage and click the extension.
-8. Choose **Download PNG** or **Download PDF**.
+8. Edit the suggested file name if needed.
+9. Choose **Download PNG** or **Download PDF**.
 
 Chrome blocks extension access to restricted pages, including `chrome://` URLs. Capture a normal webpage instead.
 
@@ -46,6 +47,6 @@ Also check these pages:
 - A page with a sticky element.
 - A restricted browser page.
 
-To reproduce a capture failure, open the long-page fixture and a second tab. On the fixture, scroll to a nonzero position and note the `window.scrollY` readout. Start a PNG or PDF capture. When the popup reports that it captured the first viewport, switch to the second tab before the next viewport. Return to the fixture and confirm that the readout has its original value. In `chrome://downloads`, confirm that no `full-page-capture.png` or `full-page-capture.pdf` file downloaded. Repeat the check with the other format if needed.
+To reproduce a capture failure, open the long-page fixture and a second tab. On the fixture, scroll to a nonzero position and note the `window.scrollY` readout. Start a PNG or PDF capture. When the popup reports that it captured the first viewport, switch to the second tab before the next viewport. Return to the fixture and confirm that the readout has its original value. In `chrome://downloads`, confirm that no new capture file was downloaded. Repeat the check with the other format if needed.
 
 On a restricted page, Chrome should block the capture.

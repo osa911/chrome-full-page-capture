@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 function createElement() {
 	return {
 		disabled: false,
+		value: '',
 		textContent: '',
 		dataset: {},
 		listeners: new Map(),
@@ -17,6 +18,7 @@ function createElement() {
 
 function createPopupDocument() {
 	const elements = {
+		'#filename': createElement(),
 		'#png': createElement(),
 		'#pdf': createElement(),
 		'#status': createElement()
@@ -41,12 +43,22 @@ it('starts the selected format and renders capture lifecycle messages', async ()
 		onMessage: { addListener: listener },
 		sendMessage: vi.fn().mockResolvedValue(undefined)
 	};
+	const tabs = {
+		query: vi.fn().mockResolvedValue([{ title: 'Example article' }])
+	};
 	const { initializePopup } = await import('../src/popup.js');
-	initializePopup(popupDocument, runtime);
+	initializePopup(popupDocument, runtime, tabs);
+	await Promise.resolve();
+	expect(popupDocument.elements['#filename'].value).toBe('Example article');
+	popupDocument.elements['#filename'].value = 'My capture';
 
 	popupDocument.elements['#pdf'].click();
 
-	expect(runtime.sendMessage).toHaveBeenCalledWith({ type: 'START_CAPTURE', format: 'pdf' });
+	expect(runtime.sendMessage).toHaveBeenCalledWith({
+		type: 'START_CAPTURE',
+		format: 'pdf',
+		filename: 'My capture'
+	});
 	expect(popupDocument.elements['#status'].textContent).toBe('Preparing capture…');
 	expect(popupDocument.elements['#png'].disabled).toBe(true);
 	expect(popupDocument.elements['#pdf'].disabled).toBe(true);
